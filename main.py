@@ -14,6 +14,10 @@ lemmatizer = WordNetLemmatizer()
 nrc_file_path = 'NRC-Emotion-Lexicon-Wordlevel-v0.92.txt'
 target_emotions = {'fear', 'negative'}
 
+negation_words = {"not", "no", "never", "none", "isn't", "aren't", "don't", "doesn't"}
+
+DEFAULT_NEGATION_DIST = 3
+
 
 def get_wordnet_pos(word):
     tag = nltk.pos_tag([word])[0][1][0].upper()
@@ -46,8 +50,26 @@ def load_nrc_lexicon(filepath):
 def count_panic_words(text, word_list):
     word_count = Counter()
     lemmatized_words = lemmatize_text(text)
-    for word in word_list:
-        word_count[word] = lemmatized_words.count(word)
+
+    negation_flag = False
+    negation_dist = DEFAULT_NEGATION_DIST
+
+    for i, word in enumerate(lemmatized_words):
+        if word in negation_words:
+            negation_flag = True
+            continue
+
+        if negation_flag:
+            if word in word_list:
+                word_count[word] -= 1
+            negation_dist -= 1
+            if negation_dist == 0:
+                negation_flag = False
+                negation_dist = DEFAULT_NEGATION_DIST
+        else:
+            if word in word_list:
+                word_count[word] += 1
+
     return word_count
 
 
@@ -66,11 +88,12 @@ def bootstrapping_word_frequencies(df, word_list, num_iterations=20):
 
     return word_weights
 
+
 def evaluate_article(text, word_weights):
     word_count = count_panic_words(text, word_weights.keys())
     score = sum(word_weights[word] * count for word, count in word_count.items())
 
-    print("\nFounded panic words and their quantity:")
+    print("\nFound panic words and their quantity:")
     for word, count in word_count.items():
         if count > 0:
             print(f"Word: {word}, Quantity: {count}, Weight: {word_weights[word]}")
@@ -87,10 +110,11 @@ if __name__ == '__main__':
     word_weights = bootstrapping_word_frequencies(df, panic_word_list, num_iterations=10)
 
     test_article = """
-    A massive earthquake has caused catastrophic damage to the city. Buildings have been destroyed, roads are flooded, and people are left without food and water.
+    A massive earthquake has not caused catastrophic damage to the city. Buildings have been destroyed, roads are flooded, and people are left without food and water.
     The death toll is rising by the hour. Rescue operations are ongoing, but the situation remains critical.
-    Local authorities are warning of possible further landslides and other natural disasters. People are urged to evacuate the danger zone immediately.
+    Local authorities are warning of possible further landslides and other natural disasters. People are urged not to evacuate the danger zone immediately.
     """
 
     score = evaluate_article(test_article, word_weights)
     print(f"\nArticle panic estimation: {score}")
+
