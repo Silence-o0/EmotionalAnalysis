@@ -73,7 +73,7 @@ def count_panic_words(text, word_list):
     return word_count
 
 
-def bootstrapping_word_frequencies(df, word_list, num_iterations=20):
+def bootstrapping_word_frequencies(df, word_list, num_iterations=10):
     word_freqs = Counter()
 
     for i in range(num_iterations):
